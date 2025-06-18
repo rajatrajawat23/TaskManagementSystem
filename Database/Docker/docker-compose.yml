@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: taskmanagement-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "SecureTask2025#@!"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+      - ./init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "SecureTask2025#@!" -Q "SELECT 1" -C
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - taskmanagement-network
+
+volumes:
+  sqlserver-data:
+    driver: local
+
+networks:
+  taskmanagement-network:
+    driver: bridge

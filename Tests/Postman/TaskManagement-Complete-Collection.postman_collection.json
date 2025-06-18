@@ -1,0 +1,656 @@
+{
+	"info": {
+		"_postman_id": "task-mgmt-complete-v2",
+		"name": "Task Management System - Complete Test Suite",
+		"description": "Comprehensive API testing collection for Task Management System including authentication, CRUD operations, validation, error handling, and performance tests",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global Pre-request Script",
+					"console.log('Executing request:', pm.info.requestName);",
+					"",
+					"// Set timestamp for performance testing",
+					"pm.globals.set('requestStartTime', Date.now());"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global Test Script",
+					"const responseTime = Date.now() - pm.globals.get('requestStartTime');",
+					"console.log(`Response time: ${responseTime}ms`);",
+					"",
+					"// Performance test - response should be under 500ms",
+					"pm.test('Response time is less than 500ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(500);",
+					"});",
+					"",
+					"// Check if response is JSON when expected",
+					"if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) {",
+					"    pm.test('Response is valid JSON', function () {",
+					"        pm.response.to.be.json;",
+					"    });",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5175/api",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "companyId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "taskId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "projectId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "clientId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Authentication Tests",
+			"item": [
+				{
+					"name": "Valid Login - SuperAdmin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has access token', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('accessToken');",
+									"    pm.expect(jsonData.accessToken).to.be.a('string');",
+									"    pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+									"});",
+									"",
+									"pm.test('Response has refresh token', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('refreshToken');",
+									"    pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+									"});",
+									"",
+									"pm.test('Response has user information', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"    pm.expect(jsonData.user).to.have.property('email');",
+									"    pm.expect(jsonData.user.role).to.equal('SuperAdmin');",
+									"});",
+									"",
+									"pm.test('JWT token is valid format', function () {",
+									"    const token = pm.response.json().accessToken;",
+									"    const parts = token.split('.');",
+									"    pm.expect(parts).to.have.lengthOf(3);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"superadmin@taskmanagement.com\",\n    \"password\": \"Admin@123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Invalid Login - Wrong Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 401', function () {",
+									"    pm.response.to.have.status(401);",
+									"});",
+									"",
+									"pm.test('Error message is present', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"superadmin@taskmanagement.com\",\n    \"password\": \"WrongPassword\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Invalid Login - Invalid Email Format",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 400', function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test('Validation error message is present', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"notanemail\",\n    \"password\": \"Admin@123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Company Management",
+			"item": [
+				{
+					"name": "Get All Companies",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is an array', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Companies have required properties', function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        const company = jsonData[0];",
+									"        pm.expect(company).to.have.property('id');",
+									"        pm.expect(company).to.have.property('name');",
+									"        pm.expect(company).to.have.property('domain');",
+									"        pm.expect(company).to.have.property('contactEmail');",
+									"        pm.collectionVariables.set('companyId', company.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/company",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"company"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Company",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201 or 200', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+									"});",
+									"",
+									"pm.test('Response has company ID', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.globals.set('newCompanyId', jsonData.id);",
+									"});",
+									"",
+									"pm.test('Company data matches request', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.name).to.equal('Test Company API');",
+									"    pm.expect(jsonData.domain).to.equal('testapi');",
+									"    pm.expect(jsonData.contactEmail).to.equal('test@testapi.com');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test Company API\",\n    \"domain\": \"testapi\",\n    \"contactEmail\": \"test@testapi.com\",\n    \"contactPhone\": \"+1234567890\",\n    \"address\": \"123 Test Street, Test City\",\n    \"subscriptionType\": \"Premium\",\n    \"maxUsers\": 25\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/company",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"company"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Task Management",
+			"item": [
+				{
+					"name": "Create Task",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201 or 200', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+									"});",
+									"",
+									"pm.test('Task has required properties', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('title');",
+									"    pm.expect(jsonData).to.have.property('taskNumber');",
+									"    pm.collectionVariables.set('taskId', jsonData.id);",
+									"});",
+									"",
+									"pm.test('Task number is auto-generated', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.taskNumber).to.match(/^TSK-\\d{4}-\\d{4}$/);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"API Test Task\",\n    \"description\": \"This task was created via API testing\",\n    \"priority\": \"High\",\n    \"status\": \"Pending\",\n    \"category\": \"Development\",\n    \"estimatedHours\": 8,\n    \"dueDate\": \"2025-12-31T23:59:59Z\",\n    \"tags\": [\"api\", \"testing\", \"backend\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/task",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"task"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Tasks",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is an array', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Tasks have correct structure', function () {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        const task = jsonData[0];",
+									"        pm.expect(task).to.have.property('id');",
+									"        pm.expect(task).to.have.property('title');",
+									"        pm.expect(task).to.have.property('status');",
+									"        pm.expect(task).to.have.property('priority');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/task",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"task"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. User Management",
+			"item": [
+				{
+					"name": "Get All Users",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is an array of users', function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"    if (jsonData.length > 0) {",
+									"        const user = jsonData[0];",
+									"        pm.expect(user).to.have.property('id');",
+									"        pm.expect(user).to.have.property('email');",
+									"        pm.expect(user).to.have.property('role');",
+									"        pm.collectionVariables.set('userId', user.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/user",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"user"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5. Error Handling Tests",
+			"item": [
+				{
+					"name": "404 Not Found",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 404', function () {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									"",
+									"pm.test('Error message present', function () {",
+									"    pm.expect(pm.response.text()).to.include('404');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/nonexistent",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"nonexistent"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SQL Injection Attempt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 400 or 401', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([400, 401]);",
+									"});",
+									"",
+									"pm.test('SQL injection prevented', function () {",
+									"    // Should not return 500 (server error)",
+									"    pm.expect(pm.response.code).to.not.equal(500);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin'; DROP TABLE Users; --\",\n    \"password\": \"test\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6. Performance Tests",
+			"item": [
+				{
+					"name": "Load Test - Get Tasks",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response time under 200ms', function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(200);",
+									"});",
+									"",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/task?pageSize=100",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"task"
+							],
+							"query": [
+								{
+									"key": "pageSize",
+									"value": "100"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

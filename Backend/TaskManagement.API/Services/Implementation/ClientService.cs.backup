@@ -1,0 +1,188 @@
+        public async Task<PagedResponseDto<ClientResponseDto>> GetAllClientsAsync(int pageNumber, int pageSize, string? searchTerm = null)
+        {
+            try
+            {
+                // SuperAdmin can see all clients across all companies
+                var isSuperAdmin = _currentUserService.UserRole == "SuperAdmin";
+                var companyId = _currentUserService.CompanyId;
+                
+                // If not SuperAdmin and no CompanyId, throw exception
+                if (!isSuperAdmin && companyId == null)
+                    throw new UnauthorizedAccessException("CompanyId not found");
+
+                var query = _unitOfWork.Clients.Query()
+                    .Include(c => c.Projects)
+                    .Include(c => c.Tasks);
+
+                // Filter by company only if not SuperAdmin
+                if (!isSuperAdmin && companyId.HasValue)
+                {
+                    query = query.Where(c => c.CompanyId == companyId.Value);
+                }
+
+                if (!string.IsNullOrEmpty(searchTerm))
+                {
+                    query = query.Where(c => c.Name.Contains(searchTerm) ||
+                                           c.Email.Contains(searchTerm) ||
+                                           c.Phone.Contains(searchTerm));
+                }
+
+                var totalCount = await query.CountAsync();
+
+                var clients = await query
+                    .OrderBy(c => c.Name)
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                var clientDtos = _mapper.Map<List<ClientResponseDto>>(clients);
+
+                return new PagedResponseDto<ClientResponseDto>
+                {
+                    Data = clientDtos,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all clients");
+                throw;
+            }
+        }
+
+        public async Task<ClientResponseDto> GetClientByIdAsync(Guid clientId)
+        {
+            try
+            {
+                var isSuperAdmin = _currentUserService.UserRole == "SuperAdmin";
+                var companyId = _currentUserService.CompanyId;
+                
+                if (!isSuperAdmin && companyId == null)
+                    throw new UnauthorizedAccessException("CompanyId not found");
+
+                var baseQuery = _unitOfWork.Clients.Query()
+                    .Include(c => c.Projects)
+                    .Include(c => c.Tasks);
+
+                IQueryable<Client> query = baseQuery.Where(c => c.Id == clientId);
+
+                // Filter by company only if not SuperAdmin
+                if (!isSuperAdmin && companyId.HasValue)
+                {
+                    query = query.Where(c => c.CompanyId == companyId.Value);
+                }
+
+                var client = await query.FirstOrDefaultAsync();
+
+                if (client == null)
+                    throw new KeyNotFoundException($"Client with ID {clientId} not found");
+
+                return _mapper.Map<ClientResponseDto>(client);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting client by ID: {ClientId}", clientId);
+                throw;
+            }
+        }
+
+        public async Task<ClientResponseDto> CreateClientAsync(CreateClientDto createClientDto)
+        {
+            try
+            {
+                var client = _mapper.Map<Client>(createClientDto);
+                client.CreatedById = _currentUserService.UserId;
+                client.UpdatedById = _currentUserService.UserId;
+
+                await _unitOfWork.Clients.AddAsync(client);
+                await _unitOfWork.SaveChangesAsync();
+
+                return await GetClientByIdAsync(client.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating client");
+                throw;
+            }
+        }
+
+        public async Task<ClientResponseDto> UpdateClientAsync(Guid clientId, UpdateClientDto updateClientDto)
+        {
+            try
+            {
+                var isSuperAdmin = _currentUserService.UserRole == "SuperAdmin";
+                var companyId = _currentUserService.CompanyId;
+                
+                if (!isSuperAdmin && companyId == null)
+                    throw new UnauthorizedAccessException("CompanyId not found");
+
+                IQueryable<Client> query = _unitOfWork.Clients.Query().Where(c => c.Id == clientId);
+
+                // Filter by company only if not SuperAdmin
+                if (!isSuperAdmin && companyId.HasValue)
+                {
+                    query = query.Where(c => c.CompanyId == companyId.Value);
+                }
+
+                var client = await query.FirstOrDefaultAsync();
+
+                if (client == null)
+                    throw new KeyNotFoundException($"Client with ID {clientId} not found");
+
+                _mapper.Map(updateClientDto, client);
+                client.UpdatedById = _currentUserService.UserId;
+                client.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.Clients.Update(client);
+                await _unitOfWork.SaveChangesAsync();
+
+                return await GetClientByIdAsync(client.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating client: {ClientId}", clientId);
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteClientAsync(Guid clientId)
+        {
+            try
+            {
+                var isSuperAdmin = _currentUserService.UserRole == "SuperAdmin";
+                var companyId = _currentUserService.CompanyId;
+                
+                if (!isSuperAdmin && companyId == null)
+                    throw new UnauthorizedAccessException("CompanyId not found");
+
+                IQueryable<Client> query = _unitOfWork.Clients.Query().Where(c => c.Id == clientId);
+
+                // Filter by company only if not SuperAdmin
+                if (!isSuperAdmin && companyId.HasValue)
+                {
+                    query = query.Where(c => c.CompanyId == companyId.Value);
+                }
+
+                var client = await query.FirstOrDefaultAsync();
+
+                if (client == null)
+                    return false;
+
+                client.IsDeleted = true;
+                client.UpdatedAt = DateTime.UtcNow;
+                client.UpdatedById = _currentUserService.UserId;
+
+                _unitOfWork.Clients.Update(client);
+                await _unitOfWork.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting client: {ClientId}", clientId);
+                throw;
+            }
+        }
