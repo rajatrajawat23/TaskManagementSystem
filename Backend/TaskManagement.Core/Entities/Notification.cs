@@ -22,7 +22,7 @@ namespace TaskManagement.Core.Entities
         public Guid? RelatedEntityId { get; set; }
 
         [MaxLength(50)]
-        public string RelatedEntityType { get; set; }
+        public string? RelatedEntityType { get; set; }
 
         public bool IsRead { get; set; } = false;
 
@@ -34,6 +34,6 @@ namespace TaskManagement.Core.Entities
         public DateTime? ExpiryDate { get; set; }
 
         // Navigation properties
-        public virtual User User { get; set; }
+        public virtual User? User { get; set; }
     }
 }

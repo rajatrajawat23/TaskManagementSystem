@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "message": "Login successful",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiJiYmJiYmJiYi1iYmJiLWJiYmItYmJiYi1iYmJiYmJiYmJiYmIiLCJlbWFpbCI6ImpvaG4uYWRtaW5AdGVjaGlubm92YXRpb25zLmNvbSIsInVuaXF1ZV9uYW1lIjoiSm9obiBBZG1pbiIsInJvbGUiOiJDb21wYW55QWRtaW4iLCJDb21wYW55SWQiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEiLCJuYmYiOjE3NTA0MDc1NjcsImV4cCI6MTc1MDQwODQ2NywiaWF0IjoxNzUwNDA3NTY3LCJpc3MiOiJUYXNrTWFuYWdlbWVudFN5c3RlbSIsImF1ZCI6IlRhc2tNYW5hZ2VtZW50Q2xpZW50cyJ9.hnnk_gY-hHyk--50V140o51PdqAHh1yxyrOMNGQzVmA",
+  "refreshToken": "Ok5UENNWjqJaZhw9IHEJmhj9fdzLQEMbDNPMuwUTqBQ=",
+  "expiresAt": "2025-06-20T08:34:27.389639Z",
+  "user": {
+    "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    "email": "john.admin@techinnovations.com",
+    "firstName": "John",
+    "lastName": "Admin",
+    "fullName": "",
+    "role": "CompanyAdmin",
+    "profileImageUrl": null,
+    "companyId": "11111111-1111-1111-1111-111111111111",
+    "companyName": "Updated Tech Innovations Inc"
+  }
+}

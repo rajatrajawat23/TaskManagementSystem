@@ -19,6 +19,7 @@ namespace TaskManagement.API.Services.Implementation
         private readonly IFileService _fileService;
         private readonly IEmailService _emailService;
         private readonly IHubContext<NotificationHub> _hubContext;
+        private readonly INotificationService _notificationService;
 
         public TaskService(
             IUnitOfWork unitOfWork,
@@ -27,7 +28,8 @@ namespace TaskManagement.API.Services.Implementation
             ILogger<TaskService> logger,
             IFileService fileService,
             IEmailService emailService,
-            IHubContext<NotificationHub> hubContext)
+            IHubContext<NotificationHub> hubContext,
+            INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _currentUserService = currentUserService;
@@ -36,6 +38,7 @@ namespace TaskManagement.API.Services.Implementation
             _fileService = fileService;
             _emailService = emailService;
             _hubContext = hubContext;
+            _notificationService = notificationService;
         }
 
         public async Task<PagedResult<TaskResponseDto>> GetTasksAsync(
@@ -355,44 +358,19 @@ namespace TaskManagement.API.Services.Implementation
                 _unitOfWork.Tasks.Update(task);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Send email notification to assignee
+                // Send integrated notification (Email + Real-time + Database)
                 try
                 {
-                    if (assignee != null && !string.IsNullOrEmpty(assignee.Email) && assignee.EmailVerified)
-                    {
-                        await _emailService.SendTaskAssignmentEmailAsync(
-                            assignee.Email,
-                            $"{assignee.FirstName} {assignee.LastName}",
-                            task.Title,
-                            task.Description ?? "No description provided"
-                        );
-                        _logger.LogInformation("Task assignment email sent to {Email} for task {TaskNumber}", assignee.Email, task.TaskNumber);
-                    }
-                }
-                catch (Exception emailEx)
-                {
-                    _logger.LogError(emailEx, "Failed to send task assignment email for task {TaskNumber}", task.TaskNumber);
-                }
-
-                // Send real-time notification
-                try
-                {
-                    var notification = new
-                    {
-                        Type = "TaskAssigned",
-                        TaskId = task.Id,
-                        TaskNumber = task.TaskNumber,
-                        Title = task.Title,
-                        AssignedBy = $"{_currentUserService.UserName}",
-                        Timestamp = DateTime.UtcNow
-                    };
-
-                    await NotificationHub.SendNotificationToUser(_hubContext, assignee.Id.ToString(), notification);
-                    _logger.LogInformation("Real-time notification sent to user {UserId} for task assignment", assignee.Id);
+                    await _notificationService.SendTaskAssignmentNotificationAsync(
+                        assignee.Id,
+                        task,
+                        _currentUserService.UserName ?? "System"
+                    );
+                    _logger.LogInformation("Integrated notification sent to user {UserId} for task assignment", assignee.Id);
                 }
                 catch (Exception notifEx)
                 {
-                    _logger.LogError(notifEx, "Failed to send real-time notification for task {TaskNumber}", task.TaskNumber);
+                    _logger.LogError(notifEx, "Failed to send integrated notification for task {TaskNumber}", task.TaskNumber);
                 }
 
                 return await GetTaskByIdAsync(task.Id, task.CompanyId);
@@ -460,23 +438,23 @@ namespace TaskManagement.API.Services.Implementation
                 _unitOfWork.Tasks.Update(task);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Send email notification for status update
+                // Send integrated notification for status update
                 try
                 {
-                    if (task.AssignedTo != null && !string.IsNullOrEmpty(task.AssignedTo.Email) && task.AssignedTo.EmailVerified)
+                    if (task.AssignedToId != null)
                     {
-                        await _emailService.SendTaskStatusUpdateEmailAsync(
-                            task.AssignedTo.Email,
-                            task.Title,
+                        await _notificationService.SendTaskStatusUpdateNotificationAsync(
+                            task.AssignedToId.Value,
+                            task,
                             previousStatus,
                             updateStatusDto.Status
                         );
-                        _logger.LogInformation("Task status update email sent to {Email} for task {TaskNumber}", task.AssignedTo.Email, task.TaskNumber);
+                        _logger.LogInformation("Task status update notification sent for task {TaskNumber}", task.TaskNumber);
                     }
                 }
-                catch (Exception emailEx)
+                catch (Exception notifEx)
                 {
-                    _logger.LogError(emailEx, "Failed to send task status update email for task {TaskNumber}", task.TaskNumber);
+                    _logger.LogError(notifEx, "Failed to send task status update notification for task {TaskNumber}", task.TaskNumber);
                 }
 
                 return await GetTaskByIdAsync(task.Id, task.CompanyId);

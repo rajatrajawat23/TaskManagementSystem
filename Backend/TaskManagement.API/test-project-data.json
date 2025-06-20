@@ -1,0 +1,11 @@
+{
+  "name": "Mobile App Development",
+  "description": "Development of a new mobile application for customer engagement",
+  "projectCode": "PROJ-2025-001",
+  "managerId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  "status": "Planning",
+  "budget": 50000,
+  "startDate": "2025-07-01T00:00:00Z",
+  "endDate": "2025-12-31T00:00:00Z",
+  "tags": ["mobile", "app", "development"]
+}

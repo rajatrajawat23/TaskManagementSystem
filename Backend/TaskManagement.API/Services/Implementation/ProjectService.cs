@@ -92,6 +92,9 @@ namespace TaskManagement.API.Services.Implementation
 
                 var projectDtos = _mapper.Map<List<ProjectResponseDto>>(projects);
 
+                // Populate team members for all projects
+                await PopulateTeamMembersAsync(projects, projectDtos);
+
                 return new PagedResult<ProjectResponseDto>
                 {
                     Items = projectDtos,
@@ -130,7 +133,33 @@ namespace TaskManagement.API.Services.Implementation
 
                 var project = await query.FirstOrDefaultAsync();
 
-                return project == null ? null : _mapper.Map<ProjectResponseDto>(project);
+                if (project == null) return null;
+
+                var projectDto = _mapper.Map<ProjectResponseDto>(project);
+
+                // Populate team members
+                if (!string.IsNullOrEmpty(project.TeamMembers))
+                {
+                    var teamMemberIds = JsonSerializer.Deserialize<List<Guid>>(project.TeamMembers);
+                    if (teamMemberIds != null && teamMemberIds.Any())
+                    {
+                        var teamMembers = await _unitOfWork.Users.Query()
+                            .Where(u => teamMemberIds.Contains(u.Id))
+                            .Select(u => new TeamMemberDto
+                            {
+                                UserId = u.Id,
+                                Name = $"{u.FirstName} {u.LastName}",
+                                Email = u.Email,
+                                Role = u.Role,
+                                ProfileImageUrl = u.ProfileImageUrl
+                            })
+                            .ToListAsync();
+
+                        projectDto.TeamMembers = teamMembers;
+                    }
+                }
+
+                return projectDto;
             }
             catch (Exception ex)
             {
@@ -143,30 +172,49 @@ namespace TaskManagement.API.Services.Implementation
         {
             try
             {
+                _logger.LogInformation("Starting project creation for {ProjectName}", createProjectDto.Name);
+                
                 var companyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
                 var userId = _currentUserService.UserId ?? throw new UnauthorizedAccessException("UserId not found");
 
+                _logger.LogInformation("CompanyId: {CompanyId}, UserId: {UserId}", companyId, userId);
+
                 var project = _mapper.Map<Project>(createProjectDto);
+                _logger.LogInformation("AutoMapper mapping completed");
+                
                 project.CompanyId = companyId;
+                
+                _logger.LogInformation("Generating project code...");
                 project.ProjectCode = await _unitOfWork.Projects.GenerateProjectCodeAsync(companyId);
+                _logger.LogInformation("Project code generated: {ProjectCode}", project.ProjectCode);
+                
                 project.CreatedById = userId;
                 project.UpdatedById = userId;
                 project.ProjectManagerId = createProjectDto.ManagerId;
+
+                _logger.LogInformation("Project mapped, ManagerId: {ManagerId}", project.ProjectManagerId);
 
                 // Convert team members list to JSON
                 if (createProjectDto.TeamMemberIds != null && createProjectDto.TeamMemberIds.Any())
                 {
                     project.TeamMembers = JsonSerializer.Serialize(createProjectDto.TeamMemberIds);
+                    _logger.LogInformation("Team members serialized: {TeamMembers}", project.TeamMembers);
                 }
 
+                _logger.LogInformation("Adding project to repository...");
                 await _unitOfWork.Projects.AddAsync(project);
+                
+                _logger.LogInformation("Saving changes to database...");
                 await _unitOfWork.SaveChangesAsync();
+                
+                _logger.LogInformation("Project created successfully with ID: {ProjectId}", project.Id);
 
                 return await GetProjectByIdAsync(project.Id, project.CompanyId) ?? throw new InvalidOperationException("Failed to get created project");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating project");
+                _logger.LogError(ex, "Error creating project: {Message}", ex.Message);
+                _logger.LogError("Stack trace: {StackTrace}", ex.StackTrace);
                 throw;
             }
         }
@@ -391,7 +439,7 @@ namespace TaskManagement.API.Services.Implementation
                 _unitOfWork.Projects.Update(project);
                 await _unitOfWork.SaveChangesAsync();
 
-                return await GetProjectByIdAsync(project.Id, project.CompanyId);
+                return await GetProjectByIdAsync(project.Id, project.CompanyId) ?? throw new InvalidOperationException("Failed to get updated project");
             }
             catch (Exception ex)
             {
@@ -549,6 +597,58 @@ namespace TaskManagement.API.Services.Implementation
             }
 
             return milestones.OrderBy(m => m.DueDate).ToList();
+        }
+
+        private async System.Threading.Tasks.Task PopulateTeamMembersAsync(List<Project> projects, List<ProjectResponseDto> projectDtos)
+        {
+            // Get all unique team member IDs from all projects
+            var allTeamMemberIds = new HashSet<Guid>();
+            
+            foreach (var project in projects)
+            {
+                if (!string.IsNullOrEmpty(project.TeamMembers))
+                {
+                    var teamMemberIds = JsonSerializer.Deserialize<List<Guid>>(project.TeamMembers);
+                    if (teamMemberIds != null)
+                    {
+                        foreach (var id in teamMemberIds)
+                        {
+                            allTeamMemberIds.Add(id);
+                        }
+                    }
+                }
+            }
+
+            if (!allTeamMemberIds.Any()) return;
+
+            // Load all team members in a single query
+            var teamMembersDict = await _unitOfWork.Users.Query()
+                .Where(u => allTeamMemberIds.Contains(u.Id))
+                .Select(u => new TeamMemberDto
+                {
+                    UserId = u.Id,
+                    Name = $"{u.FirstName} {u.LastName}",
+                    Email = u.Email,
+                    Role = u.Role,
+                    ProfileImageUrl = u.ProfileImageUrl
+                })
+                .ToDictionaryAsync(tm => tm.UserId);
+
+            // Populate team members for each project
+            for (int i = 0; i < projects.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(projects[i].TeamMembers))
+                {
+                    var teamMemberIds = JsonSerializer.Deserialize<List<Guid>>(projects[i].TeamMembers);
+                    if (teamMemberIds != null)
+                    {
+                        projectDtos[i].TeamMembers = teamMemberIds
+                            .Where(id => teamMembersDict.ContainsKey(id))
+                            .Select(id => teamMembersDict[id])
+                            .ToList();
+                    }
+                }
+            }
         }
     }
 }

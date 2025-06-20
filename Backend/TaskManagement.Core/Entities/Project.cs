@@ -40,9 +40,9 @@ namespace TaskManagement.Core.Entities
         public bool IsArchived { get; set; } = false;
 
         // Navigation properties
-        public virtual Company Company { get; set; }
-        public virtual Client Client { get; set; }
-        public virtual User ProjectManager { get; set; }
+        public virtual Company? Company { get; set; }
+        public virtual Client? Client { get; set; }
+        public virtual User? ProjectManager { get; set; }
         public virtual ICollection<Task> Tasks { get; set; } = new List<Task>();
         public virtual ICollection<ChatGroup> ChatGroups { get; set; } = new List<ChatGroup>();
     }

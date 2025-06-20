@@ -22,7 +22,7 @@ namespace TaskManagement.Infrastructure.Repositories
         private IGenericRepository<SubTask>? _subTasks;
         private IGenericRepository<ChatGroup>? _chatGroups;
         private IGenericRepository<ChatMessage>? _chatMessages;
-        private IGenericRepository<Notification>? _notifications;
+        private INotificationRepository? _notifications;
         private IGenericRepository<TaskAttachment>? _taskAttachments;
         private IGenericRepository<TaskComment>? _taskComments;
         private IGenericRepository<UserPermission>? _userPermissions;
@@ -58,8 +58,8 @@ namespace TaskManagement.Infrastructure.Repositories
         public IGenericRepository<ChatMessage> ChatMessages => 
             _chatMessages ??= new GenericRepository<ChatMessage>(_context);
 
-        public IGenericRepository<Notification> Notifications => 
-            _notifications ??= new GenericRepository<Notification>(_context);
+        public INotificationRepository Notifications => 
+            _notifications ??= new NotificationRepository(_context);
 
         public IGenericRepository<TaskAttachment> TaskAttachments => 
             _taskAttachments ??= new GenericRepository<TaskAttachment>(_context);

@@ -1,0 +1,37 @@
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating user profile: {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<UserResponseDto>> GetUsersByRoleAsync(string role)
+        {
+            try
+            {
+                var companyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                var users = await _unitOfWork.Users.GetUsersByRoleAsync(role, companyId);
+                return _mapper.Map<IEnumerable<UserResponseDto>>(users);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting users by role: {Role}", role);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<UserResponseDto>> GetUsersByCompanyAsync(Guid companyId)
+        {
+            try
+            {
+                var users = await _unitOfWork.Users.GetUsersByCompanyAsync(companyId);
+                return _mapper.Map<IEnumerable<UserResponseDto>>(users);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting users by company: {CompanyId}", companyId);
+                throw;
+            }
+        }
+    }
+}

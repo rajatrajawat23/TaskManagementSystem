@@ -1,0 +1,10 @@
+{
+  "title": "API Test Task",
+  "description": "This task was created via API testing",
+  "priority": "High",
+  "status": "Pending",
+  "category": "Development",
+  "tags": ["api", "testing", "development"],
+  "estimatedHours": 5.5,
+  "dueDate": "2025-06-30T00:00:00Z"
+}

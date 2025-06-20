@@ -99,23 +99,10 @@ namespace TaskManagement.API.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
-                dto.UserId = _currentUserService.UserId ?? throw new UnauthorizedAccessException("UserId not found");
-                dto.CompanyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
-
-                var updateDto = new UpdateUserDto
-                {
-                    Id = dto.UserId,
-                    FirstName = dto.FirstName,
-                    LastName = dto.LastName,
-                    PhoneNumber = dto.PhoneNumber,
-                    Department = dto.Department,
-                    JobTitle = dto.JobTitle
-                };
-
-                var user = await _userService.UpdateUserAsync(dto.UserId, updateDto);
-                if (user == null)
-                    return NotFound(new { message = "User not found" });
-
+                var userId = _currentUserService.UserId ?? throw new UnauthorizedAccessException("UserId not found");
+                
+                // Use the dedicated profile update method
+                var user = await _userService.UpdateProfileAsync(userId, dto);
                 return Ok(user);
             }
             catch (Exception ex)

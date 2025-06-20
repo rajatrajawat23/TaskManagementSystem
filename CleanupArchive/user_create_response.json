@@ -1,0 +1,21 @@
+{
+  "id": "8cfab45e-e558-48d1-80bb-88191cfc3633",
+  "email": "manual.test@techinnovations.com",
+  "firstName": "Manual",
+  "lastName": "Test",
+  "fullName": "Manual Test",
+  "phoneNumber": "+15551112222",
+  "profileImageUrl": null,
+  "role": "User",
+  "department": "Testing",
+  "jobTitle": "Test Engineer",
+  "isActive": true,
+  "emailVerified": false,
+  "lastLoginAt": null,
+  "createdAt": "2025-06-20T08:27:09.189774Z",
+  "updatedAt": "2025-06-20T08:27:09.189774Z",
+  "assignedTasksCount": 0,
+  "completedTasksCount": 0,
+  "permissions": [],
+  "companyName": "Updated Tech Innovations Inc"
+}

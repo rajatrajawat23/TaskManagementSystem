@@ -1,0 +1,6 @@
+{
+  "title": "Simple Test Task",
+  "description": "This is a simple task without TaskNumber",
+  "priority": "Medium",
+  "status": "Pending"
+}

@@ -50,9 +50,11 @@ namespace TaskManagement.Infrastructure.Data
             modelBuilder.Entity<Client>().HasQueryFilter(e => !e.IsDeleted);
             modelBuilder.Entity<Project>().HasQueryFilter(e => !e.IsDeleted);
             modelBuilder.Entity<ChatGroup>().HasQueryFilter(e => !e.IsDeleted);
+            modelBuilder.Entity<ChatMessage>().HasQueryFilter(e => !e.IsDeleted);
             modelBuilder.Entity<Notification>().HasQueryFilter(e => !e.IsDeleted);
             modelBuilder.Entity<TaskComment>().HasQueryFilter(e => !e.IsDeleted);
             modelBuilder.Entity<TaskAttachment>().HasQueryFilter(e => !e.IsDeleted);
+            modelBuilder.Entity<UserPermission>().HasQueryFilter(e => !e.IsDeleted);
         }
 
         public override int SaveChanges()

@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-06-19T10:33:38Z",
+  "total_tests": 12,
+  "passed": 12,
+  "failed": 0,
+  "endpoints_tested": [
+    "POST /api/Auth/login",
+    "POST /api/Auth/register",
+    "POST /api/Auth/refresh-token",
+    "POST /api/Auth/change-password",
+    "POST /api/Auth/forgot-password",
+    "POST /api/Auth/reset-password",
+    "GET /api/Auth/verify-email/{token}",
+    "POST /api/Auth/logout"
+  ]
+}

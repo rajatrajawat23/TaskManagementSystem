@@ -36,6 +36,9 @@ namespace TaskManagement.API.Extensions
 
             // Add Background Services
             services.AddHostedService<EmailNotificationService>();
+            services.AddHostedService<RecurringTaskService>();
+            services.AddHostedService<DataCleanupService>();
+            services.AddHostedService<ReportGenerationService>();
 
             // Add FluentValidation
             services.AddFluentValidationAutoValidation();

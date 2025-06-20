@@ -69,16 +69,15 @@ namespace TaskManagement.API.Services.Background
                     {
                         try
                         {
-                            await emailService.SendTaskReminderEmailAsync(
-                                task.AssignedTo.Email,
-                                task.Title,
-                                task.DueDate!.Value);
+                            // Use integrated notification service
+                            var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                            await notificationService.SendTaskReminderNotificationAsync(task.AssignedTo.Id, task);
                             
-                            _logger.LogInformation($"Reminder sent for task {task.TaskNumber} to {task.AssignedTo.Email}");
+                            _logger.LogInformation($"Reminder notification sent for task {task.TaskNumber} to user {task.AssignedTo.Id}");
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, $"Failed to send reminder for task {task.TaskNumber}");
+                            _logger.LogError(ex, $"Failed to send reminder notification for task {task.TaskNumber}");
                         }
                     }
                 }
@@ -118,10 +117,9 @@ namespace TaskManagement.API.Services.Background
                     {
                         try
                         {
-                            await emailService.SendTaskReminderEmailAsync(
-                                task.AssignedTo.Email,
-                                $"OVERDUE: {task.Title}",
-                                task.DueDate!.Value);
+                            // Use integrated notification service
+                            var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                            await notificationService.SendTaskOverdueNotificationAsync(task.AssignedTo.Id, task);
                             
                             _logger.LogInformation($"Overdue notification sent for task {task.TaskNumber} to assignee");
                         }

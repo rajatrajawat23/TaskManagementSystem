@@ -1,0 +1,2 @@
+{"id":"fad79312-7d72-49c3-8621-9c8bfe9f6fc3","name":"Test Client Corp","email":"test@testclient.com","phone":"+1234567890","address":"456 Test St","city":null,"state":null,"country":null,"postalCode":null,"website":"https://testclient.com","industry":"Testing","notes":"Test client for API testing","status":"","createdAt":"2025-06-20T06:24:05.479062Z","updatedAt":"2025-06-20T06:24:05.479079Z","contacts":[],"projectCount":0,"activeProjectCount":0,"taskCount":0}
+HTTP Code: 201

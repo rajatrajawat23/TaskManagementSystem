@@ -150,8 +150,7 @@ namespace TaskManagement.API.Mappings
                     src.Client != null ? src.Client.Name : null))
                 .ForMember(dest => dest.TaskCount, opt => opt.MapFrom(src => 
                     src.Tasks != null ? src.Tasks.Count : 0))
-                .ForMember(dest => dest.TeamMembers, opt => opt.MapFrom(src => 
-                    string.IsNullOrEmpty(src.TeamMembers) ? new List<TeamMemberDto>() : new List<TeamMemberDto>()))
+                .ForMember(dest => dest.TeamMembers, opt => opt.Ignore()) // Will be handled in service
                 .ForMember(dest => dest.CompletedTaskCount, opt => opt.MapFrom(src => 
                     src.Tasks != null ? src.Tasks.Count(t => t.Status == "Completed") : 0))
                 .ForMember(dest => dest.ManagerName, opt => opt.MapFrom(src =>

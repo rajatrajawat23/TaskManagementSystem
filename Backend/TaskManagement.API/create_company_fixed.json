@@ -1,0 +1,2 @@
+{"id":"88e69f37-618d-4a89-9bd0-7e4edb312ce8","name":"Test Company Ltd","domain":"testcompany-ltd","contactEmail":"admin@testcompany.com","contactPhone":"+1987654321","address":"456 Test Avenue","subscriptionType":"Free","subscriptionExpiryDate":null,"maxUsers":10,"isActive":true,"createdAt":"2025-06-20T06:29:10.84731Z","updatedAt":"2025-06-20T06:29:10.847311Z","activeUsersCount":0,"totalUsersCount":0,"projectsCount":0,"tasksCount":0,"userCount":0}
+HTTP Code: 201

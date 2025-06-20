@@ -1,0 +1,18 @@
+{
+  "success": false,
+  "message": "Invalid email or password",
+  "accessToken": "",
+  "refreshToken": "",
+  "expiresAt": "0001-01-01T00:00:00",
+  "user": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "email": "",
+    "firstName": "",
+    "lastName": "",
+    "fullName": "",
+    "role": "",
+    "profileImageUrl": null,
+    "companyId": null,
+    "companyName": null
+  }
+}

@@ -26,11 +26,13 @@ namespace TaskManagement.API.Services.Implementation
                 // Get task summary
                 var tasksQuery = _unitOfWork.Tasks.Query().Where(t => !t.IsDeleted);
                 
-                if (companyId.HasValue)
+                // For non-SuperAdmin users, always filter by company
+                if (userRole != "SuperAdmin" && companyId.HasValue)
                     tasksQuery = tasksQuery.Where(t => t.CompanyId == companyId.Value);
                 
+                // For regular users, filter by assigned tasks
                 if (userId.HasValue && userRole != "Manager" && userRole != "CompanyAdmin" && userRole != "SuperAdmin")
-                    tasksQuery = tasksQuery.Where(t => t.AssignedToId == userId.Value);
+                    tasksQuery = tasksQuery.Where(t => t.AssignedToId == userId.Value || t.AssignedById == userId.Value);
 
                 if (startDate.HasValue)
                     tasksQuery = tasksQuery.Where(t => t.CreatedAt >= startDate.Value);
@@ -54,7 +56,8 @@ namespace TaskManagement.API.Services.Implementation
                 // Get project summary
                 var projectsQuery = _unitOfWork.Projects.Query().Where(p => !p.IsDeleted);
                 
-                if (companyId.HasValue)
+                // For non-SuperAdmin users, always filter by company
+                if (userRole != "SuperAdmin" && companyId.HasValue)
                     projectsQuery = projectsQuery.Where(p => p.CompanyId == companyId.Value);
                 
                 var projects = await projectsQuery.ToListAsync();
@@ -67,13 +70,30 @@ namespace TaskManagement.API.Services.Implementation
                     OnHoldProjects = projects.Count(p => p.Status == "On Hold")
                 };
 
-                // Get upcoming tasks
-                var upcomingTasksQuery = tasksQuery
-                    .Where(t => t.DueDate != null && t.DueDate >= DateTime.UtcNow && t.Status != "Completed")
+                // Get upcoming tasks - need to handle navigation properties separately
+                var upcomingTasksQuery = _unitOfWork.Tasks.Query()
+                    .Where(t => !t.IsDeleted && t.DueDate != null && t.DueDate >= DateTime.UtcNow && t.Status != "Completed");
+                
+                // Apply company filter
+                if (userRole != "SuperAdmin" && companyId.HasValue)
+                    upcomingTasksQuery = upcomingTasksQuery.Where(t => t.CompanyId == companyId.Value);
+                
+                // Apply user filter for regular users
+                if (userId.HasValue && userRole != "Manager" && userRole != "CompanyAdmin" && userRole != "SuperAdmin")
+                    upcomingTasksQuery = upcomingTasksQuery.Where(t => t.AssignedToId == userId.Value);
+                
+                var upcomingTaskIds = await upcomingTasksQuery
                     .OrderBy(t => t.DueDate)
-                    .Take(10);
+                    .Take(10)
+                    .Select(t => t.Id)
+                    .ToListAsync();
 
-                dashboard.UpcomingTasks = await upcomingTasksQuery
+                var upcomingTasks = await _unitOfWork.Tasks.Query()
+                    .Where(t => upcomingTaskIds.Contains(t.Id))
+                    .Include(t => t.AssignedTo)
+                    .ToListAsync();
+
+                dashboard.UpcomingTasks = upcomingTasks
                     .Select(t => new UpcomingTaskDto
                     {
                         Id = t.Id,
@@ -83,7 +103,8 @@ namespace TaskManagement.API.Services.Implementation
                         Status = t.Status ?? "Pending",
                         AssignedToName = t.AssignedTo != null ? $"{t.AssignedTo.FirstName} {t.AssignedTo.LastName}" : null
                     })
-                    .ToListAsync();
+                    .OrderBy(t => t.DueDate)
+                    .ToList();
 
                 // Task by category
                 dashboard.TasksByCategory = tasks
@@ -100,9 +121,9 @@ namespace TaskManagement.API.Services.Implementation
                     TasksCompletedThisWeek = completedTasks.Count(t => t.CompletedDate >= DateTime.UtcNow.AddDays(-7)),
                     TasksCompletedThisMonth = completedTasks.Count(t => t.CompletedDate >= DateTime.UtcNow.AddDays(-30)),
                     OnTimeDeliveryRate = completedTasks.Any() ? 
-                        (double)completedTasks.Count(t => t.CompletedDate <= t.DueDate) / completedTasks.Count * 100 : 0,
-                    AverageTaskCompletionTime = completedTasks.Any() ? 
-                        completedTasks.Average(t => (t.CompletedDate!.Value - t.CreatedAt).TotalHours) : 0
+                        (double)completedTasks.Count(t => t.DueDate.HasValue && t.CompletedDate <= t.DueDate) / completedTasks.Count * 100 : 0,
+                    AverageTaskCompletionTime = completedTasks.Any(t => t.CompletedDate.HasValue) ? 
+                        completedTasks.Where(t => t.CompletedDate.HasValue).Average(t => (t.CompletedDate!.Value - t.CreatedAt).TotalHours) : 0
                 };
 
                 return dashboard;

@@ -9,6 +9,7 @@ namespace TaskManagement.API.Services.Interfaces
         Task<UserResponseDto> GetUserByIdAsync(Guid userId);
         Task<UserResponseDto> CreateUserAsync(CreateUserDto createUserDto);
         Task<UserResponseDto> UpdateUserAsync(Guid userId, UpdateUserDto updateUserDto);
+        Task<UserResponseDto> UpdateProfileAsync(Guid userId, UpdateProfileDto profileDto);
         Task<bool> DeleteUserAsync(Guid userId);
         Task<bool> ActivateUserAsync(Guid userId);
         Task<bool> DeactivateUserAsync(Guid userId);

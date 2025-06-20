@@ -32,7 +32,7 @@ namespace TaskManagement.API.Controllers
                     AssignedById = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                     CreatedById = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                     UpdatedById = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                    TaskNumber = $"TSK-TEST-{DateTime.UtcNow.Ticks}"
+                    TaskNumber = "TSK-DIAG-001"
                 };
 
                 _context.Tasks.Add(task);
@@ -135,6 +135,73 @@ namespace TaskManagement.API.Controllers
             }
         }
 
+        [HttpGet("check-task-triggers")]
+        public async Task<IActionResult> CheckTaskTriggers()
+        {
+            try
+            {
+                // First check for triggers (this might return empty but shouldn't cause null errors)
+                List<TriggerInfo> triggers = new List<TriggerInfo>();
+                try
+                {
+                    triggers = await _context.Database.SqlQueryRaw<TriggerInfo>(
+                        @"SELECT 
+                            ISNULL(t.name, '') AS TriggerName,
+                            ISNULL(OBJECT_NAME(t.parent_id), '') AS TableName,
+                            ISNULL(m.definition, '') AS TriggerDefinition
+                        FROM sys.triggers t
+                        INNER JOIN sys.sql_modules m ON t.object_id = m.object_id
+                        WHERE OBJECT_NAME(t.parent_id) = 'Tasks'").ToListAsync();
+                }
+                catch (Exception triggerEx)
+                {
+                    _logger.LogWarning(triggerEx, "Could not retrieve trigger information");
+                }
+
+                // Check column information with null-safe query
+                List<ColumnInfo> columns = new List<ColumnInfo>();
+                try
+                {
+                    columns = await _context.Database.SqlQueryRaw<ColumnInfo>(
+                        @"SELECT 
+                            ISNULL(COLUMN_NAME, '') as ColumnName,
+                            ISNULL(DATA_TYPE, '') as DataType,
+                            CHARACTER_MAXIMUM_LENGTH as MaxLength,
+                            ISNULL(COLUMN_DEFAULT, '') as DefaultValue
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_NAME = 'Tasks' AND TABLE_SCHEMA = 'Core' AND COLUMN_NAME = 'TaskNumber'").ToListAsync();
+                }
+                catch (Exception columnEx)
+                {
+                    _logger.LogWarning(columnEx, "Could not retrieve column information");
+                }
+
+                // Handle empty results gracefully
+                var result = new
+                {
+                    success = true,
+                    message = triggers?.Count > 0 ? $"Found {triggers.Count} trigger(s) on Tasks table" : "No triggers found on Tasks table",
+                    triggerCount = triggers?.Count ?? 0,
+                    triggers = triggers ?? new List<TriggerInfo>(),
+                    taskNumberColumn = columns?.FirstOrDefault(),
+                    columnCount = columns?.Count ?? 0,
+                    hasTaskNumberColumn = columns?.Any() == true,
+                    databaseStatus = "Connected and accessible"
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking task triggers");
+                return StatusCode(500, new { 
+                    success = false,
+                    error = ex.Message,
+                    message = "Failed to check task triggers"
+                });
+            }
+        }
+
         [HttpGet("test-client-creation")]
         public async Task<IActionResult> TestClientCreation()
         {
@@ -172,6 +239,21 @@ namespace TaskManagement.API.Controllers
             public string ColumnName { get; set; }
             public string DataType { get; set; }
             public string IsNullable { get; set; }
+        }
+
+        private class TriggerInfo
+        {
+            public string TriggerName { get; set; } = string.Empty;
+            public string TableName { get; set; } = string.Empty;
+            public string TriggerDefinition { get; set; } = string.Empty;
+        }
+
+        private class ColumnInfo
+        {
+            public string ColumnName { get; set; } = string.Empty;
+            public string DataType { get; set; } = string.Empty;
+            public int? MaxLength { get; set; }
+            public string DefaultValue { get; set; } = string.Empty;
         }
     }
 }

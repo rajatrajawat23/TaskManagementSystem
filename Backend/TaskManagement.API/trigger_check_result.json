@@ -1,0 +1,3 @@
+{"success":true,"message":"No triggers found on Tasks table","triggerCount":0,"triggers":[],"taskNumberColumn":{"columnName":"TaskNumber","dataType":"nvarchar","maxLength":20,"defaultValue":""},"columnCount":1,"hasTaskNumberColumn":true,"databaseStatus":"Connected and accessible"}
+HTTP Code: 200
+Response Time: 0.011377s

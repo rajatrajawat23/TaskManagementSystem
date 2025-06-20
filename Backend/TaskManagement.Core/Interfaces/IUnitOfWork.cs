@@ -16,7 +16,7 @@ namespace TaskManagement.Core.Interfaces
         IGenericRepository<SubTask> SubTasks { get; }
         IGenericRepository<ChatGroup> ChatGroups { get; }
         IGenericRepository<ChatMessage> ChatMessages { get; }
-        IGenericRepository<Notification> Notifications { get; }
+        INotificationRepository Notifications { get; }
         IGenericRepository<TaskAttachment> TaskAttachments { get; }
         IGenericRepository<TaskComment> TaskComments { get; }
         IGenericRepository<UserPermission> UserPermissions { get; }

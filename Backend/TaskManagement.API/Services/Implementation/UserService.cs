@@ -150,6 +150,35 @@ namespace TaskManagement.API.Services.Implementation
             }
         }
 
+        public async Task<UserResponseDto> UpdateProfileAsync(Guid userId, UpdateProfileDto profileDto)
+        {
+            try
+            {
+                var user = await _unitOfWork.Users.GetByIdAsync(userId);
+                if (user == null)
+                    throw new KeyNotFoundException($"User with ID {userId} not found");
+
+                // Update only profile-specific fields (preserve role, active status, etc.)
+                user.FirstName = profileDto.FirstName;
+                user.LastName = profileDto.LastName;
+                user.PhoneNumber = profileDto.PhoneNumber;
+                user.Department = profileDto.Department;
+                user.JobTitle = profileDto.JobTitle;
+                user.UpdatedAt = DateTime.UtcNow;
+                user.UpdatedById = _currentUserService.UserId;
+
+                _unitOfWork.Users.Update(user);
+                await _unitOfWork.SaveChangesAsync();
+
+                return await GetUserByIdAsync(user.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating user profile: {UserId}", userId);
+                throw;
+            }
+        }
+
         public async Task<bool> DeleteUserAsync(Guid userId)
         {
             try

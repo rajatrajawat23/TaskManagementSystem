@@ -61,6 +61,28 @@ namespace TaskManagement.API.Controllers
             }
         }
 
+        [HttpPost("register-test-user")]
+        public async Task<IActionResult> RegisterTestUser([FromBody] RegisterRequestDto registerRequest)
+        {
+            try
+            {
+                // This is a temporary endpoint for testing - should be removed in production
+                var result = await _authService.RegisterAsync(registerRequest);
+                
+                if (!result.Success)
+                {
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during test registration");
+                return StatusCode(500, new { message = "An error occurred during test registration" });
+            }
+        }
+
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto refreshTokenRequest)
         {
