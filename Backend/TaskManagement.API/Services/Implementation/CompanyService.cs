@@ -7,24 +7,26 @@ using TaskManagement.Core.Entities;
 using TaskManagement.Core.Interfaces;
 
 namespace TaskManagement.API.Services.Implementation
-{
-    public class CompanyService : ICompanyService
+{    public class CompanyService : ICompanyService
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly ILogger<CompanyService> _logger;
         private readonly ICurrentUserService _currentUserService;
+        private readonly IAuthService _authService;
 
         public CompanyService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             ILogger<CompanyService> logger,
-            ICurrentUserService currentUserService)
+            ICurrentUserService currentUserService,
+            IAuthService authService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _logger = logger;
             _currentUserService = currentUserService;
+            _authService = authService;
         }
 
         public async Task<PagedResult<CompanyResponseDto>> GetAllCompaniesAsync(
@@ -98,9 +100,7 @@ namespace TaskManagement.API.Services.Implementation
                 _logger.LogError(ex, "Error getting company by ID: {CompanyId}", companyId);
                 throw;
             }
-        }
-
-        public async Task<CompanyResponseDto> CreateCompanyAsync(CreateCompanyDto createCompanyDto)
+        }        public async Task<CompanyResponseDto> CreateCompanyAsync(CreateCompanyDto createCompanyDto)
         {
             try
             {
@@ -109,12 +109,45 @@ namespace TaskManagement.API.Services.Implementation
                 if (!isDomainUnique)
                     throw new InvalidOperationException($"Domain {createCompanyDto.Domain} is already in use");
 
+                // Create the company
                 var company = _mapper.Map<Company>(createCompanyDto);
                 company.CreatedById = _currentUserService.UserId;
                 company.UpdatedById = _currentUserService.UserId;
 
                 await _unitOfWork.Companies.AddAsync(company);
                 await _unitOfWork.SaveChangesAsync();
+
+                // Create the company admin user
+                var registerRequest = new RegisterRequestDto
+                {
+                    Email = createCompanyDto.AdminEmail,
+                    Password = createCompanyDto.AdminPassword,
+                    FirstName = createCompanyDto.AdminFirstName,
+                    LastName = createCompanyDto.AdminLastName,
+                    CompanyId = company.Id,
+                    Role = "CompanyAdmin", // Set the role to CompanyAdmin
+                    Department = "Administration",
+                    JobTitle = "Company Administrator"
+                };
+
+                _logger.LogInformation("Creating admin user for company {CompanyId}: {Email}", 
+                    company.Id, createCompanyDto.AdminEmail);
+
+                // Register the admin user
+                var registerResult = await _authService.RegisterAsync(registerRequest);
+                
+                if (!registerResult.Success)
+                {
+                    _logger.LogError("Failed to create admin user for company {CompanyId}: {Message}", 
+                        company.Id, registerResult.Message);
+                    
+                    // We don't want to throw here as the company has been created
+                    // but we should log the error
+                }
+                else
+                {
+                    _logger.LogInformation("Successfully created admin user for company {CompanyId}", company.Id);
+                }
 
                 return await GetCompanyByIdAsync(company.Id);
             }
@@ -147,9 +180,7 @@ namespace TaskManagement.API.Services.Implementation
                 _logger.LogError(ex, "Error updating company: {CompanyId}", companyId);
                 throw;
             }
-        }
-
-        public async Task<bool> DeleteCompanyAsync(Guid companyId)
+        }        public async Task<bool> DeleteCompanyAsync(Guid companyId)
         {
             try
             {
@@ -157,11 +188,16 @@ namespace TaskManagement.API.Services.Implementation
                 if (company == null)
                     throw new KeyNotFoundException($"Company with ID {companyId} not found");
 
-                company.IsDeleted = true;
-                company.UpdatedAt = DateTime.UtcNow;
-                company.UpdatedById = _currentUserService.UserId;
+                // Check for dependencies before deleting the company
+                var relatedEntities = await CheckCompanyDependenciesAsync(companyId);
+                if (relatedEntities.Any())
+                {
+                    var detailMessage = string.Join(", ", relatedEntities.Select(e => $"{e.Key}: {e.Value}"));
+                    throw new InvalidOperationException($"Cannot delete company because it has related records. Please delete these records first: {detailMessage}");
+                }
 
-                _unitOfWork.Companies.Update(company);
+                // If no dependencies, actually remove the company from the database
+                _unitOfWork.Companies.Remove(company);
                 await _unitOfWork.SaveChangesAsync();
 
                 return true;
@@ -414,6 +450,41 @@ namespace TaskManagement.API.Services.Implementation
                 _logger.LogError(ex, "Error getting expiring subscriptions");
                 throw;
             }
+        }
+
+        private async Task<Dictionary<string, int>> CheckCompanyDependenciesAsync(Guid companyId)
+        {
+            var dependencies = new Dictionary<string, int>();
+
+            // Check for active users
+            var usersCount = await _unitOfWork.Users.CountAsync(u => u.CompanyId == companyId && u.IsActive);
+            if (usersCount > 0)
+            {
+                dependencies.Add("Active Users", usersCount);
+            }
+
+            // Check for active projects
+            var projectsCount = await _unitOfWork.Projects.CountAsync(p => p.CompanyId == companyId && !p.IsDeleted);
+            if (projectsCount > 0)
+            {
+                dependencies.Add("Projects", projectsCount);
+            }
+
+            // Check for active tasks
+            var tasksCount = await _unitOfWork.Tasks.CountAsync(t => t.CompanyId == companyId && !t.IsDeleted);
+            if (tasksCount > 0)
+            {
+                dependencies.Add("Tasks", tasksCount);
+            }
+
+            // Check for active clients
+            var clientsCount = await _unitOfWork.Clients.CountAsync(c => c.CompanyId == companyId && !c.IsDeleted);
+            if (clientsCount > 0)
+            {
+                dependencies.Add("Clients", clientsCount);
+            }
+
+            return dependencies;
         }
     }
 }

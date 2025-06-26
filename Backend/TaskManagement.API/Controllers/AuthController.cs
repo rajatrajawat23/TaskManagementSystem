@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using TaskManagement.API.Models.DTOs.Request;
+using TaskManagement.API.Models.DTOs.Response;
 using TaskManagement.API.Services.Interfaces;
 
 namespace TaskManagement.API.Controllers
@@ -10,11 +11,19 @@ namespace TaskManagement.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly IUserService _userService;
         private readonly ILogger<AuthController> _logger;
+        private readonly ICurrentUserService _currentUserService;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(
+            IAuthService authService,
+            IUserService userService,
+            ICurrentUserService currentUserService,
+            ILogger<AuthController> logger)
         {
             _authService = authService;
+            _userService = userService;
+            _currentUserService = currentUserService;
             _logger = logger;
         }
 
@@ -214,6 +223,33 @@ namespace TaskManagement.API.Controllers
             {
                 _logger.LogError(ex, "Error verifying email");
                 return StatusCode(500, new { message = "An error occurred while verifying email" });
+            }
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            try
+            {
+                var userId = _currentUserService.UserId;
+                if (userId == null)
+                {
+                    return Unauthorized(new { message = "Not authenticated" });
+                }
+
+                var user = await _userService.GetUserByIdAsync(userId.Value);
+                if (user == null)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                return Ok(user);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting current user");
+                return StatusCode(500, new { message = "An error occurred while retrieving user information" });
             }
         }
     }

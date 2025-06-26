@@ -5,7 +5,16 @@ namespace TaskManagement.API.Services.Interfaces
 {
     public interface IUserService
     {
-        Task<PagedResult<UserResponseDto>> GetAllUsersAsync(int pageNumber, int pageSize, string? searchTerm = null);
+        Task<PagedResult<UserResponseDto>> GetAllUsersAsync(
+            int pageNumber,
+            int pageSize,
+            string? searchTerm = null,
+            Guid? companyId = null,
+            string? role = null,
+            string? department = null,
+            bool? isActive = null,
+            string? sortBy = "CreatedAt",
+            bool sortDescending = true);
         Task<UserResponseDto> GetUserByIdAsync(Guid userId);
         Task<UserResponseDto> CreateUserAsync(CreateUserDto createUserDto);
         Task<UserResponseDto> UpdateUserAsync(Guid userId, UpdateUserDto updateUserDto);

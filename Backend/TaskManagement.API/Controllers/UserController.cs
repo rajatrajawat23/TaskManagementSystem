@@ -23,9 +23,7 @@ namespace TaskManagement.API.Controllers
             _userService = userService;
             _currentUserService = currentUserService;
             _logger = logger;
-        }
-
-        [HttpGet]
+        }        [HttpGet]
         [Authorize(Policy = "Manager")]
         public async Task<ActionResult<PagedResult<UserResponseDto>>> GetUsers(
             [FromQuery] int pageNumber = 1,
@@ -35,11 +33,38 @@ namespace TaskManagement.API.Controllers
             [FromQuery] bool? isActive = null,
             [FromQuery] string? search = null,
             [FromQuery] string? sortBy = "CreatedAt",
-            [FromQuery] bool sortDescending = true)
+            [FromQuery] bool sortDescending = true,
+            [FromQuery] Guid? companyId = null)
         {
             try
-            {
-                var result = await _userService.GetAllUsersAsync(pageNumber, pageSize, search);
+            {                var currentUserRole = _currentUserService.UserRole;
+                var userCompanyId = _currentUserService.CompanyId;
+
+                _logger.LogInformation($"GetUsers called - Role: {currentUserRole}, UserCompanyId: {userCompanyId}, RequestedCompanyId: {companyId}");
+
+                // If not SuperAdmin, force company filter to user's company
+                if (currentUserRole != "SuperAdmin")
+                {
+                    companyId = userCompanyId;
+                    _logger.LogInformation($"Non-SuperAdmin user, restricting to company: {companyId}");
+                }
+                else
+                {
+                    _logger.LogInformation("SuperAdmin user, allowing access to all companies");
+                }
+
+                var result = await _userService.GetAllUsersAsync(
+                    pageNumber, 
+                    pageSize, 
+                    search,
+                    companyId,
+                    role,
+                    department,
+                    isActive,
+                    sortBy,
+                    sortDescending);
+                
+                _logger.LogInformation($"Returning {result.Items.Count} users out of {result.TotalCount} total");
                 
                 return Ok(result);
             }
@@ -48,9 +73,7 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error getting users");
                 return StatusCode(500, new { message = "An error occurred while retrieving users" });
             }
-        }
-
-        [HttpGet("{id}")]
+        }        [HttpGet("{id}")]
         public async Task<ActionResult<UserResponseDto>> GetUser(Guid id)
         {
             try
@@ -110,18 +133,29 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error updating user profile");
                 return StatusCode(500, new { message = "An error occurred while updating your profile" });
             }
-        }
-
-        [HttpPost]
+        }        [HttpPost]
         [Authorize(Policy = "CompanyAdmin")]
         public async Task<ActionResult<UserResponseDto>> CreateUser([FromBody] CreateUserDto dto)
         {
             try
-            {
-                if (!ModelState.IsValid)
+            {                if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
-                dto.CompanyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                // For non-SuperAdmin users, always use their own company ID
+                if (_currentUserService.UserRole != "SuperAdmin")
+                {
+                    dto.CompanyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                    _logger.LogInformation("Non-SuperAdmin creating user for company: {CompanyId}", dto.CompanyId);
+                }
+                else
+                {
+                    // SuperAdmin can create users for any company
+                    _logger.LogInformation("SuperAdmin creating user for company: {CompanyId}", dto.CompanyId);
+                    if (dto.CompanyId == Guid.Empty)
+                    {
+                        return BadRequest(new { message = "CompanyId is required" });
+                    }
+                }
                 dto.CreatedById = _currentUserService.UserId ?? throw new UnauthorizedAccessException("UserId not found");
 
                 var user = await _userService.CreateUserAsync(dto);
@@ -132,19 +166,37 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error creating user");
                 return StatusCode(500, new { message = "An error occurred while creating the user" });
             }
-        }
-
-        [HttpPut("{id}")]
+        }        [HttpPut("{id}")]
         [Authorize(Policy = "CompanyAdmin")]
         public async Task<ActionResult<UserResponseDto>> UpdateUser(Guid id, [FromBody] UpdateUserDto dto)
         {
             try
-            {
-                if (!ModelState.IsValid)
+            {                if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
                 dto.Id = id;
-                dto.CompanyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                
+                // For non-SuperAdmin users, always use their own company ID
+                if (_currentUserService.UserRole != "SuperAdmin")
+                {
+                    dto.CompanyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                    _logger.LogInformation("Non-SuperAdmin updating user for company: {CompanyId}", dto.CompanyId);
+                }
+                else
+                {
+                    // SuperAdmin retains the company ID from the user being updated
+                    var existingUser = await _userService.GetUserByIdAsync(id);
+                    if (existingUser == null)
+                        return NotFound(new { message = "User not found" });
+                        
+                    // Keep the existing company ID or use the one provided in the DTO
+                    if (dto.CompanyId == Guid.Empty)
+                    {
+                        return BadRequest(new { message = "CompanyId is required" });
+                    }
+                    _logger.LogInformation("SuperAdmin updating user for company: {CompanyId}", dto.CompanyId);
+                }
+                
                 dto.UpdatedById = _currentUserService.UserId ?? throw new UnauthorizedAccessException("UserId not found");
 
                 var user = await _userService.UpdateUserAsync(id, dto);
@@ -158,9 +210,7 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error updating user {UserId}", id);
                 return StatusCode(500, new { message = "An error occurred while updating the user" });
             }
-        }
-
-        [HttpDelete("{id}")]
+        }        [HttpDelete("{id}")]
         [Authorize(Policy = "CompanyAdmin")]
         public async Task<IActionResult> DeleteUser(Guid id)
         {
@@ -180,9 +230,7 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error deleting user {UserId}", id);
                 return StatusCode(500, new { message = "An error occurred while deleting the user" });
             }
-        }
-
-        [HttpPut("{id}/activate")]
+        }        [HttpPut("{id}/activate")]
         [Authorize(Policy = "CompanyAdmin")]
         public async Task<ActionResult<UserResponseDto>> ActivateUser(Guid id)
         {
@@ -200,9 +248,7 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error activating user {UserId}", id);
                 return StatusCode(500, new { message = "An error occurred while activating the user" });
             }
-        }
-
-        [HttpPut("{id}/deactivate")]
+        }        [HttpPut("{id}/deactivate")]
         [Authorize(Policy = "CompanyAdmin")]
         public async Task<ActionResult<UserResponseDto>> DeactivateUser(Guid id)
         {
@@ -223,16 +269,29 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error deactivating user {UserId}", id);
                 return StatusCode(500, new { message = "An error occurred while deactivating the user" });
             }
-        }
-
-        [HttpPut("{id}/role")]
+        }        [HttpPut("{id}/role")]
         [Authorize(Policy = "CompanyAdmin")]
         public async Task<ActionResult<UserResponseDto>> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleDto dto)
         {
             try
-            {
-                dto.UserId = id;
-                dto.CompanyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+            {                dto.UserId = id;
+                
+                // For non-SuperAdmin users, enforce company restrictions
+                if (_currentUserService.UserRole != "SuperAdmin")
+                {
+                    dto.CompanyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                    _logger.LogInformation("Non-SuperAdmin updating user role for company: {CompanyId}", dto.CompanyId);
+                }
+                else
+                {
+                    // SuperAdmin can update roles for any company
+                    if (dto.CompanyId == Guid.Empty)
+                    {
+                        return BadRequest(new { message = "CompanyId is required" });
+                    }
+                    _logger.LogInformation("SuperAdmin updating user role for company: {CompanyId}", dto.CompanyId);
+                }
+                
                 dto.UpdatedById = _currentUserService.UserId ?? throw new UnauthorizedAccessException("UserId not found");
 
                 var user = await _userService.UpdateUserRoleAsync(id, dto.Role);
@@ -252,8 +311,7 @@ namespace TaskManagement.API.Controllers
         public async Task<ActionResult<IEnumerable<TaskResponseDto>>> GetUserTasks(Guid id)
         {
             try
-            {
-                // Users can view their own tasks or managers can view any user's tasks
+            {                // Users can view their own tasks or managers can view any user's tasks
                 if (id != _currentUserService.UserId && !User.IsInRole("Manager") && !User.IsInRole("CompanyAdmin"))
                     return Forbid();
 
@@ -265,10 +323,8 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error getting tasks for user {UserId}", id);
                 return StatusCode(500, new { message = "An error occurred while retrieving user tasks" });
             }
-        }
-
-        [HttpGet("{id}/permissions")]
-        [Authorize(Policy = "CompanyAdmin")]
+        }        [HttpGet("{id}/permissions")]
+        [Authorize(Policy = "AdminAccess")] // This policy should include both CompanyAdmin and SuperAdmin
         public async Task<ActionResult<IEnumerable<UserPermissionDto>>> GetUserPermissions(Guid id)
         {
             try

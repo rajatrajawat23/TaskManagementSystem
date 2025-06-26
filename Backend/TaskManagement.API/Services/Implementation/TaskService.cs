@@ -150,9 +150,7 @@ namespace TaskManagement.API.Services.Implementation
                 _logger.LogError(ex, "Error getting tasks");
                 throw;
             }
-        }
-
-        public async Task<TaskResponseDto?> GetTaskByIdAsync(Guid taskId, Guid? companyId)
+        }        public async Task<TaskResponseDto?> GetTaskByIdAsync(Guid taskId, Guid? companyId)
         {
             try
             {
@@ -161,13 +159,10 @@ namespace TaskManagement.API.Services.Implementation
                     .Include(t => t.AssignedBy)
                     .Include(t => t.Client)
                     .Include(t => t.Project)
-                    .Include(t => t.SubTasks)
-                    .Include(t => t.Comments).ThenInclude(c => c.User)
-                    .Include(t => t.Attachments).ThenInclude(a => a.UploadedBy)
                     .Where(t => t.Id == taskId);
 
                 // Filter by company only if companyId is provided (SuperAdmin can see all)
-                if (companyId.HasValue)
+                if (companyId.HasValue && companyId.Value != Guid.Empty)
                 {
                     query = query.Where(t => t.CompanyId == companyId.Value);
                 }
@@ -177,11 +172,22 @@ namespace TaskManagement.API.Services.Implementation
                 if (task == null)
                     return null;
 
+                // Load subtasks separately to avoid circular references
+                if (task.ParentTaskId == null)  // Only load subtasks for parent tasks
+                {
+                    var subTasks = await _unitOfWork.Tasks.Query()
+                        .Where(t => t.ParentTaskId == task.Id)
+                        .ToListAsync();
+                    
+                    task.SubTasks = subTasks;
+                }
+
                 return _mapper.Map<TaskResponseDto>(task);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting task by ID: {TaskId}", taskId);
+                _logger.LogError(ex, "Error getting task by ID: {TaskId}, Exception: {ExceptionMessage}, Stack: {StackTrace}", 
+                    taskId, ex.Message, ex.StackTrace);
                 throw;
             }
         }
@@ -317,24 +323,34 @@ namespace TaskManagement.API.Services.Implementation
                 _logger.LogError(ex, "Error deleting task");
                 throw;
             }
-        }
-
-        public async Task<TaskResponseDto?> AssignTaskAsync(AssignTaskDto assignTaskDto)
+        }        public async Task<TaskResponseDto?> AssignTaskAsync(AssignTaskDto assignTaskDto)
         {
             try
             {
+                _logger.LogInformation("Attempting to assign task {TaskId} to user {UserId} (Company: {CompanyId})", 
+                    assignTaskDto.TaskId, assignTaskDto.AssignedToId, assignTaskDto.CompanyId);
+                
                 var task = await _unitOfWork.Tasks.Query()
                     .FirstOrDefaultAsync(t => t.Id == assignTaskDto.TaskId && t.CompanyId == assignTaskDto.CompanyId);
 
                 if (task == null)
+                {
+                    _logger.LogWarning("Task {TaskId} not found or doesn't belong to company {CompanyId}", 
+                        assignTaskDto.TaskId, assignTaskDto.CompanyId);
                     return null;
+                }
 
                 // Verify the assignee exists and belongs to the same company
                 var assignee = await _unitOfWork.Users.Query()
                     .FirstOrDefaultAsync(u => u.Id == assignTaskDto.AssignedToId && u.CompanyId == assignTaskDto.CompanyId);
 
                 if (assignee == null)
-                    throw new InvalidOperationException("Assignee not found or does not belong to the same company");
+                {
+                    _logger.LogWarning("Assignee {UserId} not found or doesn't belong to company {CompanyId}", 
+                        assignTaskDto.AssignedToId, assignTaskDto.CompanyId);
+                    throw new InvalidOperationException(
+                        $"Assignee with ID {assignTaskDto.AssignedToId} not found or does not belong to the same company {assignTaskDto.CompanyId}");
+                }
 
                 task.AssignedToId = assignTaskDto.AssignedToId;
                 task.AssignedById = assignTaskDto.AssignedById;
@@ -357,6 +373,7 @@ namespace TaskManagement.API.Services.Implementation
 
                 _unitOfWork.Tasks.Update(task);
                 await _unitOfWork.SaveChangesAsync();
+                _logger.LogInformation("Successfully assigned task {TaskId} to user {UserId}", task.Id, assignee.Id);
 
                 // Send integrated notification (Email + Real-time + Database)
                 try
@@ -371,13 +388,15 @@ namespace TaskManagement.API.Services.Implementation
                 catch (Exception notifEx)
                 {
                     _logger.LogError(notifEx, "Failed to send integrated notification for task {TaskNumber}", task.TaskNumber);
+                    // Don't rethrow notification errors - they shouldn't fail the assignment
                 }
 
                 return await GetTaskByIdAsync(task.Id, task.CompanyId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error assigning task");
+                _logger.LogError(ex, "Error assigning task {TaskId} to user {UserId}: {ErrorMessage}", 
+                    assignTaskDto.TaskId, assignTaskDto.AssignedToId, ex.Message);
                 throw;
             }
         }
@@ -834,6 +853,70 @@ namespace TaskManagement.API.Services.Implementation
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error adding attachment to task");
+                throw;
+            }
+        }        public async Task<IEnumerable<TaskCommentDto>> GetTaskCommentsAsync(Guid taskId, Guid companyId)
+        {
+            try
+            {
+                // If companyId is empty, it means the request is from a SuperAdmin and we should skip company check
+                IQueryable<Core.Entities.Task> taskQuery = _unitOfWork.Tasks.Query().Where(t => t.Id == taskId);
+                
+                if (companyId != Guid.Empty)
+                {
+                    taskQuery = taskQuery.Where(t => t.CompanyId == companyId);
+                }
+                
+                // Verify task exists
+                var taskExists = await taskQuery.AnyAsync();
+                if (!taskExists)
+                    return Enumerable.Empty<TaskCommentDto>();
+
+                // Get comments with user information
+                var comments = await _unitOfWork.TaskComments.Query()
+                    .Where(c => c.TaskId == taskId)
+                    .Include(c => c.User)
+                    .OrderByDescending(c => c.CreatedAt)
+                    .ToListAsync();
+
+                return _mapper.Map<IEnumerable<TaskCommentDto>>(comments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting comments for task {TaskId}, Exception: {ExceptionMessage}", 
+                    taskId, ex.Message);
+                throw;
+            }
+        }        public async Task<IEnumerable<TaskAttachmentDto>> GetTaskAttachmentsAsync(Guid taskId, Guid companyId)
+        {
+            try
+            {
+                // If companyId is empty, it means the request is from a SuperAdmin and we should skip company check
+                IQueryable<Core.Entities.Task> taskQuery = _unitOfWork.Tasks.Query().Where(t => t.Id == taskId);
+                
+                if (companyId != Guid.Empty)
+                {
+                    taskQuery = taskQuery.Where(t => t.CompanyId == companyId);
+                }
+                
+                // Verify task exists
+                var taskExists = await taskQuery.AnyAsync();
+                if (!taskExists)
+                    return Enumerable.Empty<TaskAttachmentDto>();
+
+                // Get attachments with uploader information
+                var attachments = await _unitOfWork.TaskAttachments.Query()
+                    .Where(a => a.TaskId == taskId)
+                    .Include(a => a.UploadedBy)
+                    .OrderByDescending(a => a.CreatedAt)
+                    .ToListAsync();
+
+                return _mapper.Map<IEnumerable<TaskAttachmentDto>>(attachments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting attachments for task {TaskId}, Exception: {ExceptionMessage}", 
+                    taskId, ex.Message);
                 throw;
             }
         }

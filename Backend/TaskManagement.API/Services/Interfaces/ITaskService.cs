@@ -21,5 +21,7 @@ namespace TaskManagement.API.Services.Interfaces
         Task<IEnumerable<TaskCalendarDto>> GetTasksForCalendarAsync(Guid companyId, int year, int month, Guid userId);
         Task<TaskCommentDto?> AddCommentAsync(CreateTaskCommentDto commentDto);
         Task<TaskAttachmentDto?> AddAttachmentAsync(Guid taskId, Guid companyId, Guid userId, IFormFile file);
+        Task<IEnumerable<TaskCommentDto>> GetTaskCommentsAsync(Guid taskId, Guid companyId);
+        Task<IEnumerable<TaskAttachmentDto>> GetTaskAttachmentsAsync(Guid taskId, Guid companyId);
     }
 }

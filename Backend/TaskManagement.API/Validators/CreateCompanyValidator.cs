@@ -9,13 +9,9 @@ namespace TaskManagement.API.Validators
         {
             RuleFor(x => x.Name)
                 .NotEmpty().WithMessage("Company name is required")
-                .MaximumLength(100).WithMessage("Company name must not exceed 100 characters");
-
-            RuleFor(x => x.Domain)
+                .MaximumLength(100).WithMessage("Company name must not exceed 100 characters");            RuleFor(x => x.Domain)
                 .NotEmpty().WithMessage("Domain is required")
-                .MaximumLength(50).WithMessage("Domain must not exceed 50 characters")
-                .Matches(@"^[a-zA-Z0-9][a-zA-Z0-9-]{0,48}[a-zA-Z0-9]$")
-                .WithMessage("Domain must contain only letters, numbers, and hyphens, and cannot start or end with a hyphen");
+                .MaximumLength(50).WithMessage("Domain must not exceed 50 characters");
 
             RuleFor(x => x.ContactEmail)
                 .NotEmpty().WithMessage("Contact email is required")

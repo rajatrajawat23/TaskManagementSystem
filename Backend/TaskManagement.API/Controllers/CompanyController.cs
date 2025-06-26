@@ -146,14 +146,19 @@ namespace TaskManagement.API.Controllers
         [HttpDelete("{id}")]
         [Authorize(Policy = "SuperAdmin")]
         public async Task<IActionResult> DeleteCompany(Guid id)
-        {
-            try
+        {            try
             {
                 var result = await _companyService.DeleteCompanyAsync(id);
                 if (!result)
                     return NotFound(new { message = "Company not found" });
 
                 return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("related records"))
+            {
+                // This is for dependency violations
+                _logger.LogWarning(ex, "Cannot delete company {CompanyId} due to dependencies", id);
+                return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {

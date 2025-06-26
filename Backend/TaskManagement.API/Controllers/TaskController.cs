@@ -66,9 +66,7 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error getting tasks");
                 return StatusCode(500, new { message = "An error occurred while retrieving tasks" });
             }
-        }
-
-        [HttpGet("{id}")]
+        }        [HttpGet("{id}")]
         public async Task<ActionResult<TaskResponseDto>> GetTask(Guid id)
         {
             try
@@ -88,11 +86,14 @@ namespace TaskManagement.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting task {TaskId}", id);
+                _logger.LogError(ex, "Error getting task {TaskId}, Exception: {Message}, Stack: {StackTrace}", 
+                    id, ex.Message, ex.StackTrace);
+                
                 return StatusCode(500, new { 
                     message = "An error occurred while retrieving the task",
                     detail = ex.Message,
-                    innerDetail = ex.InnerException?.Message
+                    innerDetail = ex.InnerException?.Message,
+                    stackTrace = ex.StackTrace
                 });
             }
         }
@@ -182,9 +183,7 @@ namespace TaskManagement.API.Controllers
                 _logger.LogError(ex, "Error deleting task {TaskId}", id);
                 return StatusCode(500, new { message = "An error occurred while deleting the task" });
             }
-        }
-
-        [HttpPost("{id}/assign")]
+        }        [HttpPost("{id}/assign")]
         [Authorize(Policy = "Manager")]
         public async Task<ActionResult<TaskResponseDto>> AssignTask(Guid id, [FromBody] AssignTaskDto dto)
         {
@@ -200,10 +199,22 @@ namespace TaskManagement.API.Controllers
 
                 return Ok(task);
             }
+            catch (InvalidOperationException ex)
+            {
+                // Specific error for company/user mismatch
+                _logger.LogError(ex, "Validation error assigning task {TaskId}: {ErrorMessage}", id, ex.Message);
+                return BadRequest(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error assigning task {TaskId}", id);
-                return StatusCode(500, new { message = "An error occurred while assigning the task" });
+                // Return more detailed error information for debugging
+                return StatusCode(500, new { 
+                    message = "An error occurred while assigning the task",
+                    detail = ex.Message,
+                    innerDetail = ex.InnerException?.Message,
+                    stackTrace = ex.StackTrace
+                });
             }
         }
 
@@ -384,6 +395,56 @@ namespace TaskManagement.API.Controllers
             {
                 _logger.LogError(ex, "Error adding attachment to task {TaskId}", id);
                 return StatusCode(500, new { message = "An error occurred while adding the attachment" });
+            }
+        }        [HttpGet("{id}/comment")]
+        public async Task<ActionResult<IEnumerable<TaskCommentDto>>> GetTaskComments(Guid id)
+        {
+            try
+            {
+                var companyId = Guid.Empty; // Default for SuperAdmin
+                
+                // Only apply company filter for non-SuperAdmin users
+                if (_currentUserService.UserRole != "SuperAdmin")
+                {
+                    companyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                }
+
+                var comments = await _taskService.GetTaskCommentsAsync(id, companyId);
+                return Ok(comments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting comments for task {TaskId}, Exception: {Message}", id, ex.Message);
+                return StatusCode(500, new { 
+                    message = "An error occurred while retrieving task comments",
+                    detail = ex.Message,
+                    innerDetail = ex.InnerException?.Message
+                });
+            }
+        }        [HttpGet("{id}/attachment")]
+        public async Task<ActionResult<IEnumerable<TaskAttachmentDto>>> GetTaskAttachments(Guid id)
+        {
+            try
+            {
+                var companyId = Guid.Empty; // Default for SuperAdmin
+                
+                // Only apply company filter for non-SuperAdmin users
+                if (_currentUserService.UserRole != "SuperAdmin")
+                {
+                    companyId = _currentUserService.CompanyId ?? throw new UnauthorizedAccessException("CompanyId not found");
+                }
+
+                var attachments = await _taskService.GetTaskAttachmentsAsync(id, companyId);
+                return Ok(attachments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting attachments for task {TaskId}, Exception: {Message}", id, ex.Message);
+                return StatusCode(500, new { 
+                    message = "An error occurred while retrieving task attachments",
+                    detail = ex.Message,
+                    innerDetail = ex.InnerException?.Message
+                });
             }
         }
     }

@@ -28,28 +28,63 @@ namespace TaskManagement.API.Services.Implementation
             _currentUserService = currentUserService;
         }
 
-        public async Task<PagedResult<UserResponseDto>> GetAllUsersAsync(int pageNumber, int pageSize, string? searchTerm = null)
+        public async Task<PagedResult<UserResponseDto>> GetAllUsersAsync(
+            int pageNumber,
+            int pageSize,
+            string? searchTerm = null,
+            Guid? companyId = null,
+            string? role = null,
+            string? department = null,
+            bool? isActive = null,
+            string? sortBy = "CreatedAt",
+            bool sortDescending = true)
         {
             try
             {
-                var companyId = _currentUserService.CompanyId;
-                var query = _unitOfWork.Users.Query()
-                    .Where(u => u.CompanyId == companyId);
+                var query = _unitOfWork.Users.Query();
 
+                // Apply company filter
+                if (companyId.HasValue)
+                {
+                    query = query.Where(u => u.CompanyId == companyId);
+                }
+
+                // Apply search filter
                 if (!string.IsNullOrEmpty(searchTerm))
                 {
-                    query = query.Where(u => u.FirstName.Contains(searchTerm) ||
-                                           u.LastName.Contains(searchTerm) ||
-                                           u.Email.Contains(searchTerm));
+                    query = query.Where(u => 
+                        u.FirstName.Contains(searchTerm) ||
+                        u.LastName.Contains(searchTerm) ||
+                        u.Email.Contains(searchTerm));
                 }
+
+                // Apply role filter
+                if (!string.IsNullOrEmpty(role))
+                {
+                    query = query.Where(u => u.Role == role);
+                }
+
+                // Apply department filter
+                if (!string.IsNullOrEmpty(department))
+                {
+                    query = query.Where(u => u.Department == department);
+                }
+
+                // Apply active status filter
+                if (isActive.HasValue)
+                {
+                    query = query.Where(u => u.IsActive == isActive.Value);
+                }
+
+                // Apply sorting
+                query = ApplySorting(query, sortBy, sortDescending);
 
                 var totalCount = await query.CountAsync();
 
                 var users = await query
-                    .OrderBy(u => u.FirstName)
-                    .ThenBy(u => u.LastName)
                     .Skip((pageNumber - 1) * pageSize)
                     .Take(pageSize)
+                    .Include(u => u.Company)
                     .ToListAsync();
 
                 var userDtos = _mapper.Map<List<UserResponseDto>>(users);
@@ -65,9 +100,22 @@ namespace TaskManagement.API.Services.Implementation
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting all users");
+                _logger.LogError(ex, "Error getting filtered users");
                 throw;
             }
+        }
+
+        private IQueryable<User> ApplySorting(IQueryable<User> query, string? sortBy, bool descending)
+        {
+            return sortBy?.ToLower() switch
+            {
+                "firstname" => descending ? query.OrderByDescending(u => u.FirstName) : query.OrderBy(u => u.FirstName),
+                "lastname" => descending ? query.OrderByDescending(u => u.LastName) : query.OrderBy(u => u.LastName),
+                "email" => descending ? query.OrderByDescending(u => u.Email) : query.OrderBy(u => u.Email),
+                "role" => descending ? query.OrderByDescending(u => u.Role) : query.OrderBy(u => u.Role),
+                "department" => descending ? query.OrderByDescending(u => u.Department) : query.OrderBy(u => u.Department),
+                _ => descending ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt)
+            };
         }
 
         public async Task<UserResponseDto> GetUserByIdAsync(Guid userId)
